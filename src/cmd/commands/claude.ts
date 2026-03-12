@@ -4,19 +4,19 @@ import { resolveDbPath } from '@cmd/shared/options';
 import { SqliteClient } from '@lib/api/sqlite';
 import { createAgentInvoker } from '@lib/api/invoker';
 
-export const geminiCommand = new Command()
-  .description('Invoke Gemini AI agent')
-  .option('--claude-session-id <sessionId:string>', 'Claude session ID to bind')
+export const claudeCommand = new Command()
+  .description('Invoke Claude AI agent')
+  .option('--gemini-session-id <sessionId:string>', 'Gemini session ID to bind')
   .option('--cursor-session-id <sessionId:string>', 'Cursor Agent session ID to bind')
   .option('--model <model:string>', 'Model to use')
   .option('--json', 'Output result as JSON')
   .arguments('<prompt:string>')
   .action(async (options, prompt) => {
-    const bySessionId = options.claudeSessionId ?? options.cursorSessionId;
-    const byType = options.claudeSessionId ? 'claude' : 'cursor-agent';
+    const bySessionId = options.geminiSessionId ?? options.cursorSessionId;
+    const byType = options.geminiSessionId ? 'gemini' : 'cursor-agent';
 
     if (!bySessionId) {
-      console.error('Error: Either --claude-session-id or --cursor-session-id is required');
+      console.error('Error: Either --gemini-session-id or --cursor-session-id is required');
       process.exit(1);
     }
 
@@ -26,7 +26,7 @@ export const geminiCommand = new Command()
     const invoker = createAgentInvoker(storage);
 
     try {
-      const outputId = await invoker.gemini({
+      const outputId = await invoker.claude({
         by: { type: byType, sessionId: bySessionId },
         model: options.model,
         prompt,
