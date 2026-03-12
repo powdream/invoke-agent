@@ -13,7 +13,13 @@ import type {
 
 const SCHEMA_VERSION = 2;
 
-export class SqliteClient implements ApiClient {
+const AGENT_COLUMN_MAP = {
+  gemini: 'gemini_session_id',
+  'cursor-agent': 'cursor_agent_session_id',
+  claude: 'claude_session_id',
+} as const;
+
+export class SqliteClient implements Pick<ApiClient, 'sessionId' | 'output'> {
   sessionId: SessionIdStorage;
   output: OutputStorage;
 
@@ -80,14 +86,8 @@ class SqliteSessionIdStorage implements SessionIdStorage {
   constructor(private db: Database) {}
 
   async lookup(params: LookupSessionIdParams): Promise<string | null> {
-    const columnMap: Record<AgentType, string> = {
-      gemini: 'gemini_session_id',
-      'cursor-agent': 'cursor_agent_session_id',
-      claude: 'claude_session_id',
-    };
-
-    const targetColumn = columnMap[params.target];
-    const byColumn = columnMap[params.by.type];
+    const targetColumn = AGENT_COLUMN_MAP[params.target];
+    const byColumn = AGENT_COLUMN_MAP[params.by.type];
 
     const query = `SELECT ${targetColumn} FROM session_bindings WHERE ${byColumn} = ?`;
     const result = this.db.query(query).get(params.by.sessionId) as Record<string, string> | null;
@@ -99,14 +99,8 @@ class SqliteSessionIdStorage implements SessionIdStorage {
     from: AgentSessionId<T>,
     to: AgentSessionId<Exclude<AgentType, T>>,
   ): Promise<void> {
-    const columnMap: Record<AgentType, string> = {
-      gemini: 'gemini_session_id',
-      'cursor-agent': 'cursor_agent_session_id',
-      claude: 'claude_session_id',
-    };
-
-    const fromColumn = columnMap[from.type];
-    const toColumn = columnMap[to.type];
+    const fromColumn = AGENT_COLUMN_MAP[from.type];
+    const toColumn = AGENT_COLUMN_MAP[to.type];
 
     const existing = this.db
       .query(`SELECT id FROM session_bindings WHERE ${fromColumn} = ? OR ${toColumn} = ?`)
