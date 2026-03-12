@@ -15,5 +15,8 @@
     "eslint": "^10.0.3",
     "globals": "^17.4.0",
     "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@cliffy/command": "npm:@jsr/cliffy__command"
   }
 }
