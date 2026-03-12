@@ -1,4 +1,3 @@
-import { spawn } from 'bun';
 import type {
   AgentInvoker,
   AgentSessionId,
@@ -7,10 +6,8 @@ import type {
   OutputId,
   OutputRecord,
 } from '@lib/api/client';
-import { randomUUID } from 'node:crypto';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { unlinkSync } from 'node:fs';
+import { createDefaultDeps, type FileReader, type InvokerDeps } from '@lib/api/invoker/dependency';
+
 type Client = Pick<ApiClient, 'sessionId' | 'output'>;
 
 type AgentJsonOutput = {
@@ -23,57 +20,16 @@ type GeminiJsonOutput = {
   response: string;
 };
 
-type CommandResult<T> = {
-  data: T;
-  stderr: string;
-  exitCode: number;
-};
-
-export function createAgentInvoker(client: Client): AgentInvoker {
+export function createAgentInvoker(
+  client: Client,
+  deps: InvokerDeps = createDefaultDeps(),
+): AgentInvoker {
   return {
-    claude: createClaudeInvoker(client),
-    'cursor-agent': createCursorAgentInvoker(client),
-    gemini: createGeminiInvoker(client),
+    claude: createClaudeInvoker(client, deps),
+    'cursor-agent': createCursorAgentInvoker(client, deps),
+    gemini: createGeminiInvoker(client, deps),
   };
 }
-
-async function runCommand<T>(cmd: string, args: string[]): Promise<CommandResult<T>> {
-  const proc = spawn([cmd, ...args], {
-    stdin: null,
-    stdout: 'pipe',
-    stderr: 'pipe',
-  });
-
-  const [stdout, stderr] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-  ]);
-
-  const exitCode = await proc.exited;
-  const data = JSON.parse(stdout) as T;
-
-  return {
-    data,
-    stderr,
-    exitCode,
-  };
-}
-
-const createTempFile = () => {
-  const path = join(tmpdir(), `temp-${randomUUID()}.txt`);
-
-  return {
-    path,
-    [Symbol.dispose]: () => {
-      try {
-        unlinkSync(path);
-      } catch {
-        // Ignore errors - file may not exist
-      }
-      console.log('임시 파일이 정리되었습니다.');
-    },
-  };
-};
 
 function overridePrompt(prompt: string, outputFilepath: string): string {
   return `# Prompt:
@@ -87,6 +43,7 @@ ${prompt}
 
 async function writeOutput(
   outputClient: Client['output'],
+  readFile: FileReader,
   output: { stdout: string; stderr: string; statusCode: number; filepath: string },
 ): Promise<OutputId> {
   const record: OutputRecord = {
@@ -95,19 +52,15 @@ async function writeOutput(
     statusCode: output.statusCode,
   };
 
-  try {
-    const content = await Bun.file(output.filepath).text();
-    if (content) {
-      record.fileContent = content;
-    }
-  } catch {
-    // File not found or unreadable - skip fileContent
+  const content = await readFile(output.filepath);
+  if (content) {
+    record.fileContent = content;
   }
 
   return outputClient.put(record);
 }
 
-function createClaudeInvoker(client: Client): AgentInvoker['claude'] {
+function createClaudeInvoker(client: Client, deps: InvokerDeps): AgentInvoker['claude'] {
   return async (options) => {
     const existingSessionId = await client.sessionId.lookup({
       target: 'claude',
@@ -124,17 +77,17 @@ function createClaudeInvoker(client: Client): AgentInvoker['claude'] {
       args.push('--resume', existingSessionId);
     }
 
-    using tempFile = createTempFile();
+    using tempFile = deps.createTempFile();
     args.push('--print', overridePrompt(options.prompt, tempFile.path));
 
-    const { data, stderr, exitCode } = await runCommand<AgentJsonOutput>('claude', args);
+    const { data, stderr, exitCode } = await deps.runCommand<AgentJsonOutput>('claude', args);
 
     await client.sessionId.bind(
       { type: 'claude', sessionId: data.session_id },
       options.by as AgentSessionId<Exclude<AgentType, 'claude'>>,
     );
 
-    return writeOutput(client.output, {
+    return writeOutput(client.output, deps.readFile, {
       stdout: data.result,
       stderr,
       statusCode: exitCode,
@@ -143,7 +96,7 @@ function createClaudeInvoker(client: Client): AgentInvoker['claude'] {
   };
 }
 
-function createCursorAgentInvoker(client: Client): AgentInvoker['cursor-agent'] {
+function createCursorAgentInvoker(client: Client, deps: InvokerDeps): AgentInvoker['cursor-agent'] {
   return async (options) => {
     const existingSessionId = await client.sessionId.lookup({
       target: 'cursor-agent',
@@ -160,17 +113,17 @@ function createCursorAgentInvoker(client: Client): AgentInvoker['cursor-agent'] 
       args.push('--resume', existingSessionId);
     }
 
-    using tempFile = createTempFile();
+    using tempFile = deps.createTempFile();
     args.push('--print', overridePrompt(options.prompt, tempFile.path));
 
-    const { data, stderr, exitCode } = await runCommand<AgentJsonOutput>('cursor-agent', args);
+    const { data, stderr, exitCode } = await deps.runCommand<AgentJsonOutput>('cursor-agent', args);
 
     await client.sessionId.bind(
       { type: 'cursor-agent', sessionId: data.session_id },
       options.by as AgentSessionId<Exclude<AgentType, 'cursor-agent'>>,
     );
 
-    return writeOutput(client.output, {
+    return writeOutput(client.output, deps.readFile, {
       stdout: data.result,
       stderr,
       statusCode: exitCode,
@@ -179,7 +132,7 @@ function createCursorAgentInvoker(client: Client): AgentInvoker['cursor-agent'] 
   };
 }
 
-function createGeminiInvoker(client: Client): AgentInvoker['gemini'] {
+function createGeminiInvoker(client: Client, deps: InvokerDeps): AgentInvoker['gemini'] {
   return async (options) => {
     const existingSessionId = await client.sessionId.lookup({
       target: 'gemini',
@@ -196,17 +149,17 @@ function createGeminiInvoker(client: Client): AgentInvoker['gemini'] {
       args.push('--resume', existingSessionId);
     }
 
-    using tempFile = createTempFile();
+    using tempFile = deps.createTempFile();
     args.push('--prompt', overridePrompt(options.prompt, tempFile.path));
 
-    const { data, stderr, exitCode } = await runCommand<GeminiJsonOutput>('gemini', args);
+    const { data, stderr, exitCode } = await deps.runCommand<GeminiJsonOutput>('gemini', args);
 
     await client.sessionId.bind(
       { type: 'gemini', sessionId: data.session_id },
       options.by as AgentSessionId<Exclude<AgentType, 'gemini'>>,
     );
 
-    return writeOutput(client.output, {
+    return writeOutput(client.output, deps.readFile, {
       stdout: data.response,
       stderr,
       statusCode: exitCode,
