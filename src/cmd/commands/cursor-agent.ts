@@ -1,8 +1,8 @@
 import { Command } from '@cliffy/command';
 import { Database } from 'bun:sqlite';
 import { resolveDbPath } from '@cmd/shared/options';
-import { SqliteClient } from '@lib/api/sqlite';
-import { createAgentInvoker } from '@lib/api/invoker';
+import { SqliteStorage } from '@lib/storage';
+import { createAgentInvoker } from '@lib/invoker';
 
 export const cursorAgentCommand = new Command()
   .description('Invoke Cursor Agent')
@@ -21,8 +21,7 @@ export const cursorAgentCommand = new Command()
     }
 
     const dbPath = resolveDbPath(options);
-    const db = new Database(dbPath);
-    const storage = new SqliteClient(db);
+    const storage = new SqliteStorage(new Database(dbPath));
     const invoker = createAgentInvoker(storage);
 
     try {
@@ -38,6 +37,6 @@ export const cursorAgentCommand = new Command()
         console.log(outputId);
       }
     } finally {
-      db.close();
+      storage.close();
     }
   });

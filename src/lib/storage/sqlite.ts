@@ -3,13 +3,13 @@ import { randomUUID } from 'node:crypto';
 import type {
   AgentSessionId,
   AgentType,
-  ApiClient,
   LookupSessionIdParams,
   OutputId,
   OutputRecord,
   OutputStorage,
   SessionIdStorage,
-} from '@lib/api/client';
+  Storage,
+} from '@lib/storage/types';
 
 const SCHEMA_VERSION = 2;
 
@@ -19,7 +19,7 @@ const AGENT_COLUMN_MAP = {
   claude: 'claude_session_id',
 } as const;
 
-export class SqliteClient implements Pick<ApiClient, 'sessionId' | 'output'> {
+export class SqliteStorage implements Storage {
   sessionId: SessionIdStorage;
   output: OutputStorage;
 
@@ -27,6 +27,10 @@ export class SqliteClient implements Pick<ApiClient, 'sessionId' | 'output'> {
     this.migrateIfNeeded();
     this.sessionId = new SqliteSessionIdStorage(this.db);
     this.output = new SqliteOutputStorage(this.db);
+  }
+
+  close(): void {
+    this.db.close();
   }
 
   private migrateIfNeeded(): void {

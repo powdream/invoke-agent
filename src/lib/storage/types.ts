@@ -1,9 +1,3 @@
-export interface ApiClient {
-  sessionId: SessionIdStorage;
-  output: OutputStorage;
-  agentInvoker: AgentInvoker;
-}
-
 export type AgentType = 'gemini' | 'cursor-agent' | 'claude';
 
 export type AgentSessionId<T extends AgentType> = {
@@ -42,18 +36,8 @@ export interface OutputStorage {
   put(options: OutputRecord): Promise<OutputId>;
 }
 
-export type AgentInvoker = {
-  [T in AgentType]: (options: {
-    by: AgentSessionId<Exclude<AgentType, T>>;
-    model?: string;
-    prompt: string;
-  }) => Promise<OutputId>;
-};
-
-export function createApiClient(
-  sessionId: SessionIdStorage,
-  output: OutputStorage,
-  agentInvoker: AgentInvoker,
-): ApiClient {
-  return { sessionId, output, agentInvoker };
+export interface Storage {
+  sessionId: SessionIdStorage;
+  output: OutputStorage;
+  close(): void;
 }

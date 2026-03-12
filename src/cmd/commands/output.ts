@@ -1,7 +1,7 @@
 import { Command } from '@cliffy/command';
 import { Database } from 'bun:sqlite';
 import { resolveDbPath } from '@cmd/shared/options';
-import { SqliteClient } from '@lib/api/sqlite';
+import { SqliteStorage } from '@lib/storage';
 
 const putCommand = new Command()
   .description('Store output and return an output-id')
@@ -12,8 +12,7 @@ const putCommand = new Command()
   .option('--json', 'Output result as JSON')
   .action(async (options) => {
     const dbPath = resolveDbPath(options);
-    const db = new Database(dbPath);
-    const storage = new SqliteClient(db);
+    const storage = new SqliteStorage(new Database(dbPath));
 
     try {
       let fileContent: string | undefined;
@@ -34,7 +33,7 @@ const putCommand = new Command()
         console.log(outputId);
       }
     } finally {
-      db.close();
+      storage.close();
     }
   });
 
@@ -44,8 +43,7 @@ const getCommand = new Command()
   .arguments('<outputId:string>')
   .action(async (options, outputId) => {
     const dbPath = resolveDbPath(options);
-    const db = new Database(dbPath);
-    const storage = new SqliteClient(db);
+    const storage = new SqliteStorage(new Database(dbPath));
 
     try {
       const result = await storage.output.lookup(outputId);
@@ -65,7 +63,7 @@ const getCommand = new Command()
         console.log(`  statusCode: ${result.statusCode ?? '(none)'}`);
       }
     } finally {
-      db.close();
+      storage.close();
     }
   });
 

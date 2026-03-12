@@ -1,18 +1,18 @@
 import { Database } from 'bun:sqlite';
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { SqliteClient } from '@lib/api/sqlite/sqlite_client';
-import { createAgentInvoker } from '@lib/api/invoker/invoker';
+import { SqliteStorage } from '@lib/storage';
+import { createAgentInvoker } from '@lib/invoker/invoker';
 import type {
   CommandResult,
   CommandRunner,
   FileReader,
   InvokerDeps,
   TempFileFactory,
-} from '@lib/api/invoker/dependency';
+} from '@lib/invoker/dependency';
 
 describe('createAgentInvoker', () => {
   let db: Database;
-  let client: SqliteClient;
+  let storage: SqliteStorage;
   let mockDeps: InvokerDeps;
   let capturedCommands: { cmd: string; args: string[] }[];
   let tempFileContent: string | null;
@@ -20,7 +20,7 @@ describe('createAgentInvoker', () => {
 
   beforeEach(() => {
     db = new Database(':memory:');
-    client = new SqliteClient(db);
+    storage = new SqliteStorage(db);
     capturedCommands = [];
     tempFileContent = null;
     disposed = false;
@@ -60,12 +60,12 @@ describe('createAgentInvoker', () => {
   });
 
   afterEach(() => {
-    db.close();
+    storage.close();
   });
 
   describe('claude invoker', () => {
     test('calls claude CLI with correct base args', async () => {
-      const invoker = createAgentInvoker(client, mockDeps);
+      const invoker = createAgentInvoker(storage, mockDeps);
 
       await invoker.claude({
         by: { type: 'gemini', sessionId: 'gemini-456' },
@@ -81,7 +81,7 @@ describe('createAgentInvoker', () => {
     });
 
     test('includes --model when specified', async () => {
-      const invoker = createAgentInvoker(client, mockDeps);
+      const invoker = createAgentInvoker(storage, mockDeps);
 
       await invoker.claude({
         by: { type: 'gemini', sessionId: 'gemini-456' },
@@ -94,12 +94,12 @@ describe('createAgentInvoker', () => {
     });
 
     test('includes --resume when session exists', async () => {
-      await client.sessionId.bind(
+      await storage.sessionId.bind(
         { type: 'claude', sessionId: 'existing-claude-session' },
         { type: 'gemini', sessionId: 'gemini-456' },
       );
 
-      const invoker = createAgentInvoker(client, mockDeps);
+      const invoker = createAgentInvoker(storage, mockDeps);
 
       await invoker.claude({
         by: { type: 'gemini', sessionId: 'gemini-456' },
@@ -111,14 +111,14 @@ describe('createAgentInvoker', () => {
     });
 
     test('binds new session ID after invocation', async () => {
-      const invoker = createAgentInvoker(client, mockDeps);
+      const invoker = createAgentInvoker(storage, mockDeps);
 
       await invoker.claude({
         by: { type: 'gemini', sessionId: 'gemini-456' },
         prompt: 'hello',
       });
 
-      const boundSession = await client.sessionId.lookup({
+      const boundSession = await storage.sessionId.lookup({
         target: 'claude',
         by: { type: 'gemini', sessionId: 'gemini-456' },
       });
@@ -128,14 +128,14 @@ describe('createAgentInvoker', () => {
 
     test('stores output record', async () => {
       tempFileContent = 'file content from agent';
-      const invoker = createAgentInvoker(client, mockDeps);
+      const invoker = createAgentInvoker(storage, mockDeps);
 
       const outputId = await invoker.claude({
         by: { type: 'gemini', sessionId: 'gemini-456' },
         prompt: 'hello',
       });
 
-      const output = await client.output.lookup(outputId);
+      const output = await storage.output.lookup(outputId);
       expect(output).not.toBeNull();
       expect(output!.stdout).toBe('claude result');
       expect(output!.fileContent).toBe('file content from agent');
@@ -143,7 +143,7 @@ describe('createAgentInvoker', () => {
     });
 
     test('disposes temp file after invocation', async () => {
-      const invoker = createAgentInvoker(client, mockDeps);
+      const invoker = createAgentInvoker(storage, mockDeps);
 
       await invoker.claude({
         by: { type: 'gemini', sessionId: 'gemini-456' },
@@ -156,7 +156,7 @@ describe('createAgentInvoker', () => {
 
   describe('cursor-agent invoker', () => {
     test('calls cursor-agent CLI with correct base args', async () => {
-      const invoker = createAgentInvoker(client, mockDeps);
+      const invoker = createAgentInvoker(storage, mockDeps);
 
       await invoker['cursor-agent']({
         by: { type: 'claude', sessionId: 'claude-456' },
@@ -170,7 +170,7 @@ describe('createAgentInvoker', () => {
     });
 
     test('includes --model when specified', async () => {
-      const invoker = createAgentInvoker(client, mockDeps);
+      const invoker = createAgentInvoker(storage, mockDeps);
 
       await invoker['cursor-agent']({
         by: { type: 'claude', sessionId: 'claude-456' },
@@ -183,12 +183,12 @@ describe('createAgentInvoker', () => {
     });
 
     test('includes --resume when session exists', async () => {
-      await client.sessionId.bind(
+      await storage.sessionId.bind(
         { type: 'cursor-agent', sessionId: 'existing-cursor-session' },
         { type: 'claude', sessionId: 'claude-456' },
       );
 
-      const invoker = createAgentInvoker(client, mockDeps);
+      const invoker = createAgentInvoker(storage, mockDeps);
 
       await invoker['cursor-agent']({
         by: { type: 'claude', sessionId: 'claude-456' },
@@ -200,14 +200,14 @@ describe('createAgentInvoker', () => {
     });
 
     test('binds new session ID after invocation', async () => {
-      const invoker = createAgentInvoker(client, mockDeps);
+      const invoker = createAgentInvoker(storage, mockDeps);
 
       await invoker['cursor-agent']({
         by: { type: 'claude', sessionId: 'claude-456' },
         prompt: 'hello',
       });
 
-      const boundSession = await client.sessionId.lookup({
+      const boundSession = await storage.sessionId.lookup({
         target: 'cursor-agent',
         by: { type: 'claude', sessionId: 'claude-456' },
       });
@@ -218,7 +218,7 @@ describe('createAgentInvoker', () => {
 
   describe('gemini invoker', () => {
     test('calls gemini CLI with correct base args', async () => {
-      const invoker = createAgentInvoker(client, mockDeps);
+      const invoker = createAgentInvoker(storage, mockDeps);
 
       await invoker.gemini({
         by: { type: 'claude', sessionId: 'claude-456' },
@@ -231,7 +231,7 @@ describe('createAgentInvoker', () => {
     });
 
     test('includes --model when specified', async () => {
-      const invoker = createAgentInvoker(client, mockDeps);
+      const invoker = createAgentInvoker(storage, mockDeps);
 
       await invoker.gemini({
         by: { type: 'claude', sessionId: 'claude-456' },
@@ -244,12 +244,12 @@ describe('createAgentInvoker', () => {
     });
 
     test('includes --resume when session exists', async () => {
-      await client.sessionId.bind(
+      await storage.sessionId.bind(
         { type: 'gemini', sessionId: 'existing-gemini-session' },
         { type: 'claude', sessionId: 'claude-456' },
       );
 
-      const invoker = createAgentInvoker(client, mockDeps);
+      const invoker = createAgentInvoker(storage, mockDeps);
 
       await invoker.gemini({
         by: { type: 'claude', sessionId: 'claude-456' },
@@ -261,26 +261,26 @@ describe('createAgentInvoker', () => {
     });
 
     test('uses response field instead of result', async () => {
-      const invoker = createAgentInvoker(client, mockDeps);
+      const invoker = createAgentInvoker(storage, mockDeps);
 
       const outputId = await invoker.gemini({
         by: { type: 'claude', sessionId: 'claude-456' },
         prompt: 'hello',
       });
 
-      const output = await client.output.lookup(outputId);
+      const output = await storage.output.lookup(outputId);
       expect(output!.stdout).toBe('gemini response');
     });
 
     test('binds new session ID after invocation', async () => {
-      const invoker = createAgentInvoker(client, mockDeps);
+      const invoker = createAgentInvoker(storage, mockDeps);
 
       await invoker.gemini({
         by: { type: 'claude', sessionId: 'claude-456' },
         prompt: 'hello',
       });
 
-      const boundSession = await client.sessionId.lookup({
+      const boundSession = await storage.sessionId.lookup({
         target: 'gemini',
         by: { type: 'claude', sessionId: 'claude-456' },
       });
@@ -301,28 +301,28 @@ describe('createAgentInvoker', () => {
           }) as CommandResult<T>,
       };
 
-      const invoker = createAgentInvoker(client, errorDeps);
+      const invoker = createAgentInvoker(storage, errorDeps);
 
       const outputId = await invoker.claude({
         by: { type: 'gemini', sessionId: 'gemini-456' },
         prompt: 'hello',
       });
 
-      const output = await client.output.lookup(outputId);
+      const output = await storage.output.lookup(outputId);
       expect(output!.statusCode).toBe(1);
       expect(output!.stderr).toBe('something went wrong');
     });
 
     test('handles missing file content gracefully', async () => {
       tempFileContent = null;
-      const invoker = createAgentInvoker(client, mockDeps);
+      const invoker = createAgentInvoker(storage, mockDeps);
 
       const outputId = await invoker.claude({
         by: { type: 'gemini', sessionId: 'gemini-456' },
         prompt: 'hello',
       });
 
-      const output = await client.output.lookup(outputId);
+      const output = await storage.output.lookup(outputId);
       expect(output!.fileContent).toBeUndefined();
     });
   });

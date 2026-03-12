@@ -1,14 +1,6 @@
-import type {
-  AgentInvoker,
-  AgentSessionId,
-  AgentType,
-  ApiClient,
-  OutputId,
-  OutputRecord,
-} from '@lib/api/client';
-import { createDefaultDeps, type FileReader, type InvokerDeps } from '@lib/api/invoker/dependency';
-
-type Client = Pick<ApiClient, 'sessionId' | 'output'>;
+import type { AgentSessionId, AgentType, OutputId, OutputRecord, Storage } from '@lib/storage';
+import type { AgentInvoker } from '@lib/invoker/types';
+import { createDefaultDeps, type FileReader, type InvokerDeps } from '@lib/invoker/dependency';
 
 type AgentJsonOutput = {
   session_id: string;
@@ -21,13 +13,13 @@ type GeminiJsonOutput = {
 };
 
 export function createAgentInvoker(
-  client: Client,
+  storage: Storage,
   deps: InvokerDeps = createDefaultDeps(),
 ): AgentInvoker {
   return {
-    claude: createClaudeInvoker(client, deps),
-    'cursor-agent': createCursorAgentInvoker(client, deps),
-    gemini: createGeminiInvoker(client, deps),
+    claude: createClaudeInvoker(storage, deps),
+    'cursor-agent': createCursorAgentInvoker(storage, deps),
+    gemini: createGeminiInvoker(storage, deps),
   };
 }
 
@@ -42,7 +34,7 @@ ${prompt}
 }
 
 async function writeOutput(
-  outputClient: Client['output'],
+  outputStorage: Storage['output'],
   readFile: FileReader,
   output: { stdout: string; stderr: string; statusCode: number; filepath: string },
 ): Promise<OutputId> {
@@ -57,12 +49,12 @@ async function writeOutput(
     record.fileContent = content;
   }
 
-  return outputClient.put(record);
+  return outputStorage.put(record);
 }
 
-function createClaudeInvoker(client: Client, deps: InvokerDeps): AgentInvoker['claude'] {
+function createClaudeInvoker(storage: Storage, deps: InvokerDeps): AgentInvoker['claude'] {
   return async (options) => {
-    const existingSessionId = await client.sessionId.lookup({
+    const existingSessionId = await storage.sessionId.lookup({
       target: 'claude',
       by: options.by,
     });
@@ -82,12 +74,12 @@ function createClaudeInvoker(client: Client, deps: InvokerDeps): AgentInvoker['c
 
     const { data, stderr, exitCode } = await deps.runCommand<AgentJsonOutput>('claude', args);
 
-    await client.sessionId.bind(
+    await storage.sessionId.bind(
       { type: 'claude', sessionId: data.session_id },
       options.by as AgentSessionId<Exclude<AgentType, 'claude'>>,
     );
 
-    return writeOutput(client.output, deps.readFile, {
+    return writeOutput(storage.output, deps.readFile, {
       stdout: data.result,
       stderr,
       statusCode: exitCode,
@@ -96,9 +88,12 @@ function createClaudeInvoker(client: Client, deps: InvokerDeps): AgentInvoker['c
   };
 }
 
-function createCursorAgentInvoker(client: Client, deps: InvokerDeps): AgentInvoker['cursor-agent'] {
+function createCursorAgentInvoker(
+  storage: Storage,
+  deps: InvokerDeps,
+): AgentInvoker['cursor-agent'] {
   return async (options) => {
-    const existingSessionId = await client.sessionId.lookup({
+    const existingSessionId = await storage.sessionId.lookup({
       target: 'cursor-agent',
       by: options.by,
     });
@@ -118,12 +113,12 @@ function createCursorAgentInvoker(client: Client, deps: InvokerDeps): AgentInvok
 
     const { data, stderr, exitCode } = await deps.runCommand<AgentJsonOutput>('cursor-agent', args);
 
-    await client.sessionId.bind(
+    await storage.sessionId.bind(
       { type: 'cursor-agent', sessionId: data.session_id },
       options.by as AgentSessionId<Exclude<AgentType, 'cursor-agent'>>,
     );
 
-    return writeOutput(client.output, deps.readFile, {
+    return writeOutput(storage.output, deps.readFile, {
       stdout: data.result,
       stderr,
       statusCode: exitCode,
@@ -132,9 +127,9 @@ function createCursorAgentInvoker(client: Client, deps: InvokerDeps): AgentInvok
   };
 }
 
-function createGeminiInvoker(client: Client, deps: InvokerDeps): AgentInvoker['gemini'] {
+function createGeminiInvoker(storage: Storage, deps: InvokerDeps): AgentInvoker['gemini'] {
   return async (options) => {
-    const existingSessionId = await client.sessionId.lookup({
+    const existingSessionId = await storage.sessionId.lookup({
       target: 'gemini',
       by: options.by,
     });
@@ -154,12 +149,12 @@ function createGeminiInvoker(client: Client, deps: InvokerDeps): AgentInvoker['g
 
     const { data, stderr, exitCode } = await deps.runCommand<GeminiJsonOutput>('gemini', args);
 
-    await client.sessionId.bind(
+    await storage.sessionId.bind(
       { type: 'gemini', sessionId: data.session_id },
       options.by as AgentSessionId<Exclude<AgentType, 'gemini'>>,
     );
 
-    return writeOutput(client.output, deps.readFile, {
+    return writeOutput(storage.output, deps.readFile, {
       stdout: data.response,
       stderr,
       statusCode: exitCode,

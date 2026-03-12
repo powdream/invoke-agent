@@ -1,18 +1,18 @@
 import { Database } from 'bun:sqlite';
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { SqliteClient } from '@lib/api/sqlite/sqlite_client';
+import { SqliteStorage } from '@lib/storage/sqlite';
 
-describe('SqliteClient', () => {
+describe('SqliteStorage', () => {
   let db: Database;
-  let client: SqliteClient;
+  let storage: SqliteStorage;
 
   beforeEach(() => {
     db = new Database(':memory:');
-    client = new SqliteClient(db);
+    storage = new SqliteStorage(db);
   });
 
   afterEach(() => {
-    db.close();
+    storage.close();
   });
 
   describe('schema migration', () => {
@@ -38,7 +38,7 @@ describe('SqliteClient', () => {
     test('skips migration when schema version matches', () => {
       const before = db.query(`SELECT value FROM schema_meta WHERE key = 'version'`).get();
 
-      new SqliteClient(db);
+      new SqliteStorage(db);
 
       const after = db.query(`SELECT value FROM schema_meta WHERE key = 'version'`).get();
       expect(after).toEqual(before);
@@ -48,17 +48,28 @@ describe('SqliteClient', () => {
       db.run(`INSERT INTO outputs (id, stdout) VALUES ('test-id', 'test-output')`);
       db.run(`UPDATE schema_meta SET value = '0' WHERE key = 'version'`);
 
-      new SqliteClient(db);
+      new SqliteStorage(db);
 
       const result = db.query(`SELECT COUNT(*) as count FROM outputs`).get() as { count: number };
       expect(result.count).toBe(0);
     });
   });
 
+  describe('close', () => {
+    test('closes the database connection', () => {
+      const testDb = new Database(':memory:');
+      const testStorage = new SqliteStorage(testDb);
+
+      testStorage.close();
+
+      expect(() => testDb.query('SELECT 1').get()).toThrow();
+    });
+  });
+
   describe('SessionIdStorage', () => {
     describe('lookup', () => {
       test('returns null when no binding exists', async () => {
-        const result = await client.sessionId.lookup({
+        const result = await storage.sessionId.lookup({
           target: 'gemini',
           by: { type: 'claude', sessionId: 'claude-123' },
         });
@@ -67,12 +78,12 @@ describe('SqliteClient', () => {
       });
 
       test('returns session ID when binding exists', async () => {
-        await client.sessionId.bind(
+        await storage.sessionId.bind(
           { type: 'gemini', sessionId: 'gemini-123' },
           { type: 'claude', sessionId: 'claude-123' },
         );
 
-        const result = await client.sessionId.lookup({
+        const result = await storage.sessionId.lookup({
           target: 'gemini',
           by: { type: 'claude', sessionId: 'claude-123' },
         });
@@ -81,12 +92,12 @@ describe('SqliteClient', () => {
       });
 
       test('returns null when querying by unbound session', async () => {
-        await client.sessionId.bind(
+        await storage.sessionId.bind(
           { type: 'gemini', sessionId: 'gemini-123' },
           { type: 'claude', sessionId: 'claude-123' },
         );
 
-        const result = await client.sessionId.lookup({
+        const result = await storage.sessionId.lookup({
           target: 'gemini',
           by: { type: 'cursor-agent', sessionId: 'cursor-456' },
         });
@@ -95,12 +106,12 @@ describe('SqliteClient', () => {
       });
 
       test('works with all agent type combinations', async () => {
-        await client.sessionId.bind(
+        await storage.sessionId.bind(
           { type: 'cursor-agent', sessionId: 'cursor-123' },
           { type: 'claude', sessionId: 'claude-123' },
         );
 
-        const result = await client.sessionId.lookup({
+        const result = await storage.sessionId.lookup({
           target: 'cursor-agent',
           by: { type: 'claude', sessionId: 'claude-123' },
         });
@@ -111,7 +122,7 @@ describe('SqliteClient', () => {
 
     describe('bind', () => {
       test('creates new binding when none exists', async () => {
-        await client.sessionId.bind(
+        await storage.sessionId.bind(
           { type: 'gemini', sessionId: 'gemini-123' },
           { type: 'claude', sessionId: 'claude-123' },
         );
@@ -122,12 +133,12 @@ describe('SqliteClient', () => {
       });
 
       test('updates existing binding when from session already bound', async () => {
-        await client.sessionId.bind(
+        await storage.sessionId.bind(
           { type: 'gemini', sessionId: 'gemini-123' },
           { type: 'claude', sessionId: 'claude-123' },
         );
 
-        await client.sessionId.bind(
+        await storage.sessionId.bind(
           { type: 'gemini', sessionId: 'gemini-123' },
           { type: 'cursor-agent', sessionId: 'cursor-456' },
         );
@@ -141,12 +152,12 @@ describe('SqliteClient', () => {
       });
 
       test('updates existing binding when to session already bound', async () => {
-        await client.sessionId.bind(
+        await storage.sessionId.bind(
           { type: 'gemini', sessionId: 'gemini-123' },
           { type: 'claude', sessionId: 'claude-123' },
         );
 
-        await client.sessionId.bind(
+        await storage.sessionId.bind(
           { type: 'cursor-agent', sessionId: 'cursor-456' },
           { type: 'claude', sessionId: 'claude-123' },
         );
@@ -160,17 +171,17 @@ describe('SqliteClient', () => {
       });
 
       test('can bind all three agent types together', async () => {
-        await client.sessionId.bind(
+        await storage.sessionId.bind(
           { type: 'gemini', sessionId: 'gemini-123' },
           { type: 'claude', sessionId: 'claude-123' },
         );
 
-        await client.sessionId.bind(
+        await storage.sessionId.bind(
           { type: 'cursor-agent', sessionId: 'cursor-456' },
           { type: 'claude', sessionId: 'claude-123' },
         );
 
-        const geminiResult = await client.sessionId.lookup({
+        const geminiResult = await storage.sessionId.lookup({
           target: 'gemini',
           by: { type: 'cursor-agent', sessionId: 'cursor-456' },
         });
@@ -183,19 +194,19 @@ describe('SqliteClient', () => {
   describe('OutputStorage', () => {
     describe('lookup', () => {
       test('returns null when output does not exist', async () => {
-        const result = await client.output.lookup('non-existent-id');
+        const result = await storage.output.lookup('non-existent-id');
         expect(result).toBeNull();
       });
 
       test('returns full output record when all fields exist', async () => {
-        const id = await client.output.put({
+        const id = await storage.output.put({
           stdout: 'hello world',
           stderr: 'error message',
           fileContent: 'file data',
           statusCode: 0,
         });
 
-        const result = await client.output.lookup(id);
+        const result = await storage.output.lookup(id);
 
         expect(result).toEqual({
           stdout: 'hello world',
@@ -206,11 +217,11 @@ describe('SqliteClient', () => {
       });
 
       test('returns output record with optional fields as undefined', async () => {
-        const id = await client.output.put({
+        const id = await storage.output.put({
           stdout: 'hello world',
         });
 
-        const result = await client.output.lookup(id);
+        const result = await storage.output.lookup(id);
 
         expect(result).toEqual({
           stdout: 'hello world',
@@ -223,15 +234,15 @@ describe('SqliteClient', () => {
 
     describe('put', () => {
       test('stores output and returns unique ID', async () => {
-        const id1 = await client.output.put({ stdout: 'output 1' });
-        const id2 = await client.output.put({ stdout: 'output 2' });
+        const id1 = await storage.output.put({ stdout: 'output 1' });
+        const id2 = await storage.output.put({ stdout: 'output 2' });
 
         expect(id1).not.toBe(id2);
         expect(id1).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
       });
 
       test('stores all optional fields', async () => {
-        const id = await client.output.put({
+        const id = await storage.output.put({
           stdout: 'stdout',
           stderr: 'stderr',
           fileContent: 'content',
@@ -250,7 +261,7 @@ describe('SqliteClient', () => {
       });
 
       test('stores null for undefined optional fields', async () => {
-        const id = await client.output.put({
+        const id = await storage.output.put({
           stdout: 'stdout only',
         });
 
