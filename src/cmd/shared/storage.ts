@@ -1,4 +1,5 @@
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { mkdirSync } from 'node:fs';
 import { Database } from 'bun:sqlite';
 import type { Storage } from '@lib/storage';
 import { SqliteStorage } from '@lib/storage';
@@ -17,6 +18,7 @@ function resolveDbPath(options: DbOptions): string {
 
 export function createStorage(options: DbOptions): Storage & Disposable {
   const dbPath = resolveDbPath(options);
+  mkdirSync(dirname(dbPath), { recursive: true });
   const storage = new SqliteStorage(new Database(dbPath));
   return {
     sessionId: storage.sessionId,

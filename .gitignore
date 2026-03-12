@@ -4,3 +4,4 @@
 /var/
 *.sqlite
 /.cursor
+/.claude/*.local.json
