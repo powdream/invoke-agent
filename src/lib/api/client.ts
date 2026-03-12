@@ -49,3 +49,11 @@ export type AgentInvoker = {
     prompt: string;
   }) => Promise<OutputId>;
 };
+
+export function createApiClient(
+  sessionId: SessionIdStorage,
+  output: OutputStorage,
+  agentInvoker: AgentInvoker,
+): ApiClient {
+  return { sessionId, output, agentInvoker };
+}
