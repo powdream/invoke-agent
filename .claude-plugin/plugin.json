@@ -1,0 +1,8 @@
+{
+  "name": "invoke-agent",
+  "description": "Invoke external AI agents (Claude, Cursor Agent, Gemini) from Claude Code",
+  "version": "0.0.1",
+  "author": {
+    "name": "Heejoon Kang"
+  }
+}

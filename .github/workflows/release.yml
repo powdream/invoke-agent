@@ -1,0 +1,127 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      next_version_tag:
+        description: "Next version tag (e.g. 1.0.0 or v1.0.0)"
+        required: true
+        type: string
+      ref:
+        description: "Ref to base from (branch, tag, or SHA)"
+        required: false
+        default: "main"
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+
+      - name: Set version from input
+        id: version
+        env:
+          RAW: ${{ inputs.next_version_tag }}
+        run: |
+          VERSION="${RAW#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION, Tag: v$VERSION"
+
+      - name: Get Bun version from mise.toml
+        id: bun-version
+        run: |
+          VERSION=$(sed -n 's/^\s*bun\s*=\s*"\([^"]*\)".*/\1/p' mise.toml | head -1)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Bun version: $VERSION"
+
+      - name: Update package.json version
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            p.version = process.env.VERSION;
+            fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+
+      - name: Update plugin version
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const path = process.env.PLUGIN_JSON;
+            if (!fs.existsSync(path)) {
+              core.info('No ' + path + ' found, skipping');
+              return;
+            }
+            const p = JSON.parse(fs.readFileSync(path, 'utf8'));
+            p.version = process.env.VERSION;
+            fs.writeFileSync(path, JSON.stringify(p, null, 2) + '\n');
+            core.info('Updated ' + path + ' to version ' + process.env.VERSION);
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          PLUGIN_JSON: .claude-plugin/plugin.json
+
+      - name: Commit and push version bump
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json
+          [ -f .claude-plugin/plugin.json ] && git add .claude-plugin/plugin.json
+          git diff --staged --quiet && echo "No version changes" && exit 0
+          git commit -m "chore: release v$VERSION"
+          if git symbolic-ref -q HEAD; then
+            git push origin HEAD
+          else
+            git push origin HEAD:main
+          fi
+
+      - name: Create and push tag
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git tag "$TAG"
+          git push origin "$TAG"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2.1.3
+        with:
+          bun-version: ${{ steps.bun-version.outputs.version }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build
+        run: bun run build
+
+      - name: Create release archives (zip)
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir -p release-artifacts
+          for dir in dist/*/; do
+            triple=$(basename "$dir")
+            (cd dist && zip -r "../release-artifacts/invoke-agent-${VERSION}-${triple}.zip" "$triple")
+          done
+          ls -la release-artifacts/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2.5.0
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          generate_release_notes: true
+          files: release-artifacts/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
