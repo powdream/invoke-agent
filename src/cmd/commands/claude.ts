@@ -1,7 +1,5 @@
 import { Command } from '@cliffy/command';
-import { Database } from 'bun:sqlite';
-import { resolveDbPath } from '@cmd/shared/options';
-import { SqliteStorage } from '@lib/storage';
+import { createStorage } from '@cmd/shared/storage';
 import { createAgentInvoker } from '@lib/invoker';
 
 export const claudeCommand = new Command()
@@ -20,8 +18,7 @@ export const claudeCommand = new Command()
       process.exit(1);
     }
 
-    const dbPath = resolveDbPath(options);
-    const storage = new SqliteStorage(new Database(dbPath));
+    const storage = createStorage(options);
     const invoker = createAgentInvoker(storage);
 
     try {
