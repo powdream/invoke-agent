@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "@cmd/*": ["src/cmd/*"],
+      "@lib/*": ["src/lib/*"]
+    },
+    "types": ["bun-types"],
+    "verbatimModuleSyntax": true
+  },
+  "include": ["src", "tools"],
+  "exclude": ["dist", "node_modules"]
+}

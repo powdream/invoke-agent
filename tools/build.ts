@@ -1,31 +1,36 @@
-#!/usr/bin/env -S deno run --allow-all
+#!/usr/bin/env bun
 
-import $ from "@david/dax";
+type Target = {
+  archLabel: string;
+  target: string;
+  extension?: string;
+};
 
-const SUPPORTED_ARCHS = [
-  "x86_64-unknown-linux-gnu",
-  "aarch64-unknown-linux-gnu",
-  "x86_64-pc-windows-msvc",
-  "x86_64-apple-darwin",
-  "aarch64-apple-darwin",
+const TARGETS: Target[] = [
+  { archLabel: "x86_64-unknown-linux-gnu", target: "bun-linux-x64" },
+  { archLabel: "aarch64-unknown-linux-gnu", target: "bun-linux-arm64" },
+  { archLabel: "x86_64-pc-windows-msvc", target: "bun-windows-x64", extension: ".exe" },
+  { archLabel: "x86_64-apple-darwin", target: "bun-darwin-x64" },
+  { archLabel: "aarch64-apple-darwin", target: "bun-darwin-arm64" },
 ];
 
 async function main() {
-  for (const arch of SUPPORTED_ARCHS) {
-    await build(arch);
+  for (const target of TARGETS) {
+    await buildTarget(target);
   }
 }
 
-async function build(arch: string) {
-  let output = `./dist/${arch}/invoke-agent`;
-  if (arch.includes("windows")) {
-    output += ".exe";
-  }
-
-  await $`deno compile --allow-all --output ${output} --target ${arch} ./src/cmd/main.ts`;
-  console.log(`Built ${output}`);
+async function buildTarget({ archLabel, target, extension }: Target) {
+  const outputDir = `./dist/${archLabel}`;
+  await Bun.$`mkdir -p ${outputDir}`;
+  const outfile = `${outputDir}/invoke-agent${extension ?? ""}`;
+  await Bun.$`bun build --compile --target=${target} ./src/cmd/main.ts --outfile ${outfile}`;
+  console.log(`Built ${outfile}`);
 }
 
 if (import.meta.main) {
-  main();
+  main().catch((error) => {
+    console.error("Build failed", error);
+    process.exit(1);
+  });
 }

@@ -1,0 +1,19 @@
+{
+  "name": "invoke-agent",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run src/cmd/main.ts",
+    "build": "bun run tools/build.ts",
+    "lint": "bunx eslint . --ext .ts"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.10",
+    "@types/node": "^25.4.0",
+    "@typescript-eslint/eslint-plugin": "^8.57.0",
+    "@typescript-eslint/parser": "^8.57.0",
+    "eslint": "^10.0.3",
+    "globals": "^17.4.0",
+    "typescript": "^5.9.3"
+  }
+}
