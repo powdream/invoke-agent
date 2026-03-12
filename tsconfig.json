@@ -10,7 +10,8 @@
       "@lib/*": ["src/lib/*"]
     },
     "types": ["bun-types"],
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "noEmit": true
   },
   "include": ["src", "tools"],
   "exclude": ["dist", "node_modules"]

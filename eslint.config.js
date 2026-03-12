@@ -29,7 +29,7 @@ export default [
         {
           patterns: [
             {
-              group: ["./*", "../*"],
+              regex: "^\\.\\.?\\/(?!.*package\\.json$).*",
               message: "Use @cmd/ or @lib/ aliases instead of relative paths.",
             },
           ],

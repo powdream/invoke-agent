@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "bun run src/cmd/main.ts",
     "build": "bun run tools/build.ts",
-    "lint": "bunx eslint . --ext .ts"
+    "lint": "bunx eslint . --ext .ts",
+    "typecheck": "bunx tsc --noEmit"
   },
   "devDependencies": {
     "@types/bun": "^1.3.10",
