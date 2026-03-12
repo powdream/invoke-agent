@@ -227,9 +227,7 @@ describe('SqliteClient', () => {
         const id2 = await client.output.put({ stdout: 'output 2' });
 
         expect(id1).not.toBe(id2);
-        expect(id1).toMatch(
-          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
-        );
+        expect(id1).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
       });
 
       test('stores all optional fields', async () => {
