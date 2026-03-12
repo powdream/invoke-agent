@@ -1,10 +1,6 @@
-import { join } from "node:path";
+import { join } from 'node:path';
 
-const DEFAULT_DB_PATH = join(
-  process.cwd(),
-  ".invoke-agent",
-  "communication.db",
-);
+const DEFAULT_DB_PATH = join(process.cwd(), '.invoke-agent', 'communication.db');
 
 interface DbOptions {
   db?: string;

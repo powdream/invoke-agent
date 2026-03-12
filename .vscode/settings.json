@@ -3,22 +3,22 @@
   "files.autoSaveDelay": 1000,
   "[jsonc]": {
     "editor.formatOnSave": true,
-    "editor.defaultFormatter": "denoland.vscode-deno",
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.suggest.insertMode": "replace"
   },
   "[json]": {
     "editor.formatOnSave": true,
-    "editor.defaultFormatter": "denoland.vscode-deno",
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.suggest.insertMode": "replace"
   },
   "[javascript]": {
     "editor.formatOnSave": true,
-    "editor.defaultFormatter": "denoland.vscode-deno",
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.suggest.insertMode": "replace"
   },
   "[typescript]": {
     "editor.formatOnSave": true,
-    "editor.defaultFormatter": "denoland.vscode-deno",
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.suggest.insertMode": "replace"
   }
 }

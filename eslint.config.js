@@ -1,36 +1,36 @@
-import js from "@eslint/js";
-import tsParser from "@typescript-eslint/parser";
-import tsPlugin from "@typescript-eslint/eslint-plugin";
-import globals from "globals";
+import js from '@eslint/js';
+import tsParser from '@typescript-eslint/parser';
+import tsPlugin from '@typescript-eslint/eslint-plugin';
+import globals from 'globals';
 
 export default [
   {
-    ignores: ["dist/**", "node_modules/**", "var/**"],
+    ignores: ['dist/**', 'node_modules/**', 'var/**'],
   },
   {
-    files: ["**/*.ts"],
+    files: ['**/*.ts'],
     languageOptions: {
       parser: tsParser,
-      sourceType: "module",
-      ecmaVersion: "latest",
+      sourceType: 'module',
+      ecmaVersion: 'latest',
       globals: {
         ...globals.node,
-        Bun: "readonly",
+        Bun: 'readonly',
       },
     },
     plugins: {
-      "@typescript-eslint": tsPlugin,
+      '@typescript-eslint': tsPlugin,
     },
     rules: {
       ...js.configs.recommended.rules,
       ...tsPlugin.configs.recommended.rules,
-      "no-restricted-imports": [
-        "error",
+      'no-restricted-imports': [
+        'error',
         {
           patterns: [
             {
-              regex: "^\\.\\.?\\/(?!.*package\\.json$).*",
-              message: "Use @cmd/ or @lib/ aliases instead of relative paths.",
+              regex: '^\\.\\.?\\/(?!.*package\\.json$).*',
+              message: 'Use @cmd/ or @lib/ aliases instead of relative paths.',
             },
           ],
         },
