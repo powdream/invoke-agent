@@ -18,22 +18,18 @@ export const claudeCommand = new Command()
       process.exit(1);
     }
 
-    const storage = createStorage(options);
+    using storage = createStorage(options);
     const invoker = createAgentInvoker(storage);
 
-    try {
-      const outputId = await invoker.claude({
-        by: { type: byType, sessionId: bySessionId },
-        model: options.model,
-        prompt,
-      });
+    const outputId = await invoker.claude({
+      by: { type: byType, sessionId: bySessionId },
+      model: options.model,
+      prompt,
+    });
 
-      if (options.json) {
-        console.log(JSON.stringify({ outputId }));
-      } else {
-        console.log(outputId);
-      }
-    } finally {
-      storage.close();
+    if (options.json) {
+      console.log(JSON.stringify({ outputId }));
+    } else {
+      console.log(outputId);
     }
   });

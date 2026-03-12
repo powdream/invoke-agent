@@ -9,28 +9,24 @@ const putCommand = new Command()
   .option('--status <code:integer>', 'Exit status code')
   .option('--json', 'Output result as JSON')
   .action(async (options) => {
-    const storage = createStorage(options);
+    using storage = createStorage(options);
 
-    try {
-      let fileContent: string | undefined;
-      if (options.file) {
-        fileContent = await Bun.file(options.file).text();
-      }
+    let fileContent: string | undefined;
+    if (options.file) {
+      fileContent = await Bun.file(options.file).text();
+    }
 
-      const outputId = await storage.output.put({
-        stdout: options.stdout,
-        stderr: options.stderr,
-        fileContent,
-        statusCode: options.status,
-      });
+    const outputId = await storage.output.put({
+      stdout: options.stdout,
+      stderr: options.stderr,
+      fileContent,
+      statusCode: options.status,
+    });
 
-      if (options.json) {
-        console.log(JSON.stringify({ outputId }));
-      } else {
-        console.log(outputId);
-      }
-    } finally {
-      storage.close();
+    if (options.json) {
+      console.log(JSON.stringify({ outputId }));
+    } else {
+      console.log(outputId);
     }
   });
 
@@ -39,27 +35,23 @@ const getCommand = new Command()
   .option('--json', 'Output result as JSON')
   .arguments('<outputId:string>')
   .action(async (options, outputId) => {
-    const storage = createStorage(options);
+    using storage = createStorage(options);
 
-    try {
-      const result = await storage.output.lookup(outputId);
+    const result = await storage.output.lookup(outputId);
 
-      if (!result) {
-        console.error(`Output not found: ${outputId}`);
-        process.exit(1);
-      }
+    if (!result) {
+      console.error(`Output not found: ${outputId}`);
+      process.exit(1);
+    }
 
-      if (options.json) {
-        console.log(JSON.stringify({ outputId, ...result }));
-      } else {
-        console.log(`Output ID: ${outputId}`);
-        console.log(`  stdout: ${result.stdout || '(empty)'}`);
-        console.log(`  stderr: ${result.stderr ?? '(empty)'}`);
-        console.log(`  fileContent: ${result.fileContent ?? '(none)'}`);
-        console.log(`  statusCode: ${result.statusCode ?? '(none)'}`);
-      }
-    } finally {
-      storage.close();
+    if (options.json) {
+      console.log(JSON.stringify({ outputId, ...result }));
+    } else {
+      console.log(`Output ID: ${outputId}`);
+      console.log(`  stdout: ${result.stdout || '(empty)'}`);
+      console.log(`  stderr: ${result.stderr ?? '(empty)'}`);
+      console.log(`  fileContent: ${result.fileContent ?? '(none)'}`);
+      console.log(`  statusCode: ${result.statusCode ?? '(none)'}`);
     }
   });
 

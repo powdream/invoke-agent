@@ -15,7 +15,15 @@ function resolveDbPath(options: DbOptions): string {
   return options.db ?? options.databasePath ?? DEFAULT_DB_PATH;
 }
 
-export function createStorage(options: DbOptions): Storage {
+export function createStorage(options: DbOptions): Storage & Disposable {
   const dbPath = resolveDbPath(options);
-  return new SqliteStorage(new Database(dbPath));
+  const storage = new SqliteStorage(new Database(dbPath));
+  return {
+    sessionId: storage.sessionId,
+    output: storage.output,
+    close: () => storage.close(),
+    [Symbol.dispose](): void {
+      storage.close();
+    },
+  };
 }
