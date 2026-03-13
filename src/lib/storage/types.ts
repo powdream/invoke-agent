@@ -14,7 +14,6 @@ export interface ThreadTurn {
   prompt: string;
   outputId: string;
   createdAt: number;
-  output?: OutputRecord;
 }
 
 export interface ThreadSummary {

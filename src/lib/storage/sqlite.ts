@@ -105,7 +105,7 @@ class SqliteThreadStorage implements ThreadStorage {
       SELECT responder_session_id 
       FROM session_threads 
       WHERE requester_type = ? AND requester_session_id = ? AND responder_type = ?
-      ORDER BY created_at DESC 
+      ORDER BY id DESC
       LIMIT 1
     `;
     const result = this.db.query(query).get(requester.type, requester.sessionId, targetAgentType) as { responder_session_id: string } | null;

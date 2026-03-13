@@ -1,2 +1,2 @@
 export * from '@lib/invoker/types';
-export { createAgentInvoker } from '@lib/invoker/invoker';
+export { createAgentInvoker, overridePrompt } from '@lib/invoker/invoker';

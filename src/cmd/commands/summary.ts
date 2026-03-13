@@ -1,6 +1,7 @@
 import { Command } from '@cliffy/command';
 import { createStorage } from '@cmd/shared/storage';
 import { createDefaultDeps } from '@lib/invoker/dependency';
+import { overridePrompt } from '@lib/invoker';
 import type { AgentType } from '@lib/storage';
 
 export const summaryCommand = new Command()
@@ -47,14 +48,7 @@ export const summaryCommand = new Command()
     const promptText = `Please summarize the following conversation in one paragraph. Keep it concise.\n\n${conversationText}`;
 
     using tempFile = deps.createTempFile();
-    const overridenPrompt = `# Prompt:\n${promptText}\n\n# Output:\n- **Write only the summary to the specified file: ${tempFile.path}**\n- **Do not print anything else.**\n`;
-
-    const { exitCode } = await deps.runCommand('gemini', ['--output-format', 'json', '--yolo', '--prompt', overridenPrompt]);
-
-    if (exitCode !== 0) {
-      console.error('Failed to generate summary.');
-      process.exit(1);
-    }
+    await deps.runCommand('gemini', ['--output-format', 'json', '--yolo', '--prompt', overridePrompt(promptText, tempFile.path)]);
 
     const summaryText = (await deps.readFile(tempFile.path)) || '';
 

@@ -13,14 +13,14 @@ export const promptCommand = new Command()
   .option('--json', 'Output result as JSON')
   .arguments('<prompt:string>')
   .action(async (options, prompt) => {
-    const validAgents = ['claude', 'cursor-agent', 'gemini'];
+    const validAgents = ['claude', 'cursor-agent', 'gemini'] as const satisfies readonly AgentType[];
     
-    if (!validAgents.includes(options.to)) {
+    if (!validAgents.includes(options.to as AgentType)) {
       console.error(`Error: Invalid target agent '${options.to}'. Valid options are: ${validAgents.join(', ')}`);
       process.exit(1);
     }
-    
-    if (!validAgents.includes(options.from)) {
+
+    if (!validAgents.includes(options.from as AgentType)) {
       console.error(`Error: Invalid requester agent '${options.from}'. Valid options are: ${validAgents.join(', ')}`);
       process.exit(1);
     }

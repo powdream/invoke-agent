@@ -2,14 +2,18 @@ import type { AgentSessionId, AgentType, OutputId, OutputRecord, Storage } from 
 import type { AgentInvoker } from '@lib/invoker/types';
 import { createDefaultDeps, type FileReader, type InvokerDeps } from '@lib/invoker/dependency';
 
-type AgentJsonOutput = {
+type AnyOutput = {
   session_id: string;
-  result: string;
+  result?: string;
+  response?: string;
 };
 
-type GeminiJsonOutput = {
-  session_id: string;
-  response: string;
+type InvokerConfig = {
+  command: string;
+  agentType: AgentType;
+  authFlag: string;
+  promptFlag: string;
+  getOutput: (data: AnyOutput) => string;
 };
 
 export function createAgentInvoker(
@@ -17,13 +21,22 @@ export function createAgentInvoker(
   deps: InvokerDeps = createDefaultDeps(),
 ): AgentInvoker {
   return {
-    claude: createClaudeInvoker(storage, deps),
-    'cursor-agent': createCursorAgentInvoker(storage, deps),
-    gemini: createGeminiInvoker(storage, deps),
+    claude: createInvoker(
+      { command: 'claude', agentType: 'claude', authFlag: '--dangerously-skip-permissions', promptFlag: '--print', getOutput: d => d.result ?? '' },
+      storage, deps,
+    ),
+    'cursor-agent': createInvoker(
+      { command: 'cursor-agent', agentType: 'cursor-agent', authFlag: '--force', promptFlag: '--print', getOutput: d => d.result ?? '' },
+      storage, deps,
+    ),
+    gemini: createInvoker(
+      { command: 'gemini', agentType: 'gemini', authFlag: '--yolo', promptFlag: '--prompt', getOutput: d => d.response ?? '' },
+      storage, deps,
+    ),
   };
 }
 
-function overridePrompt(prompt: string, outputFilepath: string): string {
+export function overridePrompt(prompt: string, outputFilepath: string): string {
   return `# Prompt:
 ${prompt}
 
@@ -52,14 +65,14 @@ async function writeOutput(
   return outputStorage.put(record);
 }
 
-function createClaudeInvoker(storage: Storage, deps: InvokerDeps): AgentInvoker['claude'] {
-  return async (options) => {
+function createInvoker(config: InvokerConfig, storage: Storage, deps: InvokerDeps) {
+  return async (options: { by: AgentSessionId; model?: string; prompt: string; newSession?: boolean }): Promise<OutputId> => {
     let existingSessionId: string | null = null;
     if (!options.newSession) {
-      existingSessionId = await storage.threads.lookupLastSessionId(options.by, 'claude');
+      existingSessionId = await storage.threads.lookupLastSessionId(options.by, config.agentType);
     }
 
-    const args = ['--output-format', 'json', '--dangerously-skip-permissions'];
+    const args = ['--output-format', 'json', config.authFlag];
 
     if (options.model) {
       args.push('--model', options.model);
@@ -70,12 +83,12 @@ function createClaudeInvoker(storage: Storage, deps: InvokerDeps): AgentInvoker[
     }
 
     using tempFile = deps.createTempFile();
-    args.push('--print', overridePrompt(options.prompt, tempFile.path));
+    args.push(config.promptFlag, overridePrompt(options.prompt, tempFile.path));
 
-    const { data, stderr, exitCode } = await deps.runCommand<AgentJsonOutput>('claude', args);
+    const { data, stderr, exitCode } = await deps.runCommand<AnyOutput>(config.command, args);
 
     const outputId = await writeOutput(storage.output, deps.readFile, {
-      stdout: data.result,
+      stdout: config.getOutput(data),
       stderr,
       statusCode: exitCode,
       filepath: tempFile.path,
@@ -84,94 +97,7 @@ function createClaudeInvoker(storage: Storage, deps: InvokerDeps): AgentInvoker[
     if (data.session_id) {
       await storage.threads.append({
         requester: options.by,
-        responder: { type: 'claude', sessionId: data.session_id },
-        prompt: options.prompt,
-        outputId,
-      });
-    }
-
-    return outputId;
-  };
-}
-
-function createCursorAgentInvoker(
-  storage: Storage,
-  deps: InvokerDeps,
-): AgentInvoker['cursor-agent'] {
-  return async (options) => {
-    let existingSessionId: string | null = null;
-    if (!options.newSession) {
-      existingSessionId = await storage.threads.lookupLastSessionId(options.by, 'cursor-agent');
-    }
-
-    const args = ['--output-format', 'json', '--force'];
-
-    if (options.model) {
-      args.push('--model', options.model);
-    }
-
-    if (existingSessionId) {
-      args.push('--resume', existingSessionId);
-    }
-
-    using tempFile = deps.createTempFile();
-    args.push('--print', overridePrompt(options.prompt, tempFile.path));
-
-    const { data, stderr, exitCode } = await deps.runCommand<AgentJsonOutput>('cursor-agent', args);
-
-    const outputId = await writeOutput(storage.output, deps.readFile, {
-      stdout: data.result,
-      stderr,
-      statusCode: exitCode,
-      filepath: tempFile.path,
-    });
-
-    if (data.session_id) {
-      await storage.threads.append({
-        requester: options.by,
-        responder: { type: 'cursor-agent', sessionId: data.session_id },
-        prompt: options.prompt,
-        outputId,
-      });
-    }
-
-    return outputId;
-  };
-}
-
-function createGeminiInvoker(storage: Storage, deps: InvokerDeps): AgentInvoker['gemini'] {
-  return async (options) => {
-    let existingSessionId: string | null = null;
-    if (!options.newSession) {
-      existingSessionId = await storage.threads.lookupLastSessionId(options.by, 'gemini');
-    }
-
-    const args = ['--output-format', 'json', '--yolo'];
-
-    if (options.model) {
-      args.push('--model', options.model);
-    }
-
-    if (existingSessionId) {
-      args.push('--resume', existingSessionId);
-    }
-
-    using tempFile = deps.createTempFile();
-    args.push('--prompt', overridePrompt(options.prompt, tempFile.path));
-
-    const { data, stderr, exitCode } = await deps.runCommand<GeminiJsonOutput>('gemini', args);
-
-    const outputId = await writeOutput(storage.output, deps.readFile, {
-      stdout: data.response,
-      stderr,
-      statusCode: exitCode,
-      filepath: tempFile.path,
-    });
-
-    if (data.session_id) {
-      await storage.threads.append({
-        requester: options.by,
-        responder: { type: 'gemini', sessionId: data.session_id },
+        responder: { type: config.agentType, sessionId: data.session_id },
         prompt: options.prompt,
         outputId,
       });
