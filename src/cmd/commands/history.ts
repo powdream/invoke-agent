@@ -32,12 +32,28 @@ export const historyCommand = new Command()
       console.log(`[Agent Response] (${responder.type})`);
       console.log(`==================================================`);
       
-      const responseText = output?.stdout || output?.fileContent;
-      
-      if (responseText) {
-        console.log(responseText);
-      } else {
-        console.log(`(No output found or stdout/fileContent was empty)`);
+      let hasOutput = false;
+
+      if (output?.stdout) {
+        console.log(`--- stdout ---`);
+        console.log(output.stdout);
+        hasOutput = true;
+      }
+
+      if (output?.fileContent) {
+        if (hasOutput) console.log(`\n--- fileContent ---`);
+        console.log(output.fileContent);
+        hasOutput = true;
+      }
+
+      if (output?.stderr) {
+        if (hasOutput) console.log(`\n--- stderr ---`);
+        console.log(output.stderr);
+        hasOutput = true;
+      }
+
+      if (!hasOutput) {
+        console.log(`(No output found)`);
       }
     }
     console.log(`\n==================================================`);
