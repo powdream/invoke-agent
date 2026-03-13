@@ -81,12 +81,14 @@ function createClaudeInvoker(storage: Storage, deps: InvokerDeps): AgentInvoker[
       filepath: tempFile.path,
     });
 
-    await storage.threads.append({
-      requester: options.by,
-      responder: { type: 'claude', sessionId: data.session_id },
-      prompt: options.prompt,
-      outputId,
-    });
+    if (data.session_id) {
+      await storage.threads.append({
+        requester: options.by,
+        responder: { type: 'claude', sessionId: data.session_id },
+        prompt: options.prompt,
+        outputId,
+      });
+    }
 
     return outputId;
   };
@@ -124,12 +126,14 @@ function createCursorAgentInvoker(
       filepath: tempFile.path,
     });
 
-    await storage.threads.append({
-      requester: options.by,
-      responder: { type: 'cursor-agent', sessionId: data.session_id },
-      prompt: options.prompt,
-      outputId,
-    });
+    if (data.session_id) {
+      await storage.threads.append({
+        requester: options.by,
+        responder: { type: 'cursor-agent', sessionId: data.session_id },
+        prompt: options.prompt,
+        outputId,
+      });
+    }
 
     return outputId;
   };
@@ -164,12 +168,14 @@ function createGeminiInvoker(storage: Storage, deps: InvokerDeps): AgentInvoker[
       filepath: tempFile.path,
     });
 
-    await storage.threads.append({
-      requester: options.by,
-      responder: { type: 'gemini', sessionId: data.session_id },
-      prompt: options.prompt,
-      outputId,
-    });
+    if (data.session_id) {
+      await storage.threads.append({
+        requester: options.by,
+        responder: { type: 'gemini', sessionId: data.session_id },
+        prompt: options.prompt,
+        outputId,
+      });
+    }
 
     return outputId;
   };

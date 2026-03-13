@@ -48,7 +48,7 @@ export function createDefaultDeps(): InvokerDeps {
     } catch (e) {
       // Handle the case where the agent crashes or returns non-JSON output (e.g. login prompt)
       data = {
-        session_id: randomUUID(),
+        session_id: '',
         result: stdout,
         response: stdout, 
       } as unknown as T;
