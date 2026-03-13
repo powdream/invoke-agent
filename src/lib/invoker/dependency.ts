@@ -41,7 +41,21 @@ export function createDefaultDeps(): InvokerDeps {
     ]);
 
     const exitCode = await proc.exited;
-    const data = JSON.parse(stdout) as T;
+
+    let data: T;
+    try {
+      data = JSON.parse(stdout) as T;
+    } catch (e) {
+      // Handle the case where the agent crashes or returns non-JSON output (e.g. login prompt)
+      data = {
+        session_id: randomUUID(),
+        result: stdout,
+        response: stdout, 
+      } as unknown as T;
+      
+      const parseErrorMsg = `Failed to parse agent output as JSON. Raw output:\n${stdout}\nStderr:\n${stderr}`;
+      return { data, stderr: stderr || parseErrorMsg, exitCode: exitCode || 1 };
+    }
 
     return { data, stderr, exitCode };
   };

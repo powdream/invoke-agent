@@ -102,7 +102,7 @@ function createCursorAgentInvoker(
       existingSessionId = await storage.threads.lookupLastSessionId(options.by, 'cursor-agent');
     }
 
-    const args = ['--output-format', 'json', '--force', '--trust'];
+    const args = ['--output-format', 'json', '--force'];
 
     if (options.model) {
       args.push('--model', options.model);

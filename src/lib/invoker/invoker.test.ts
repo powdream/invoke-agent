@@ -185,7 +185,6 @@ describe('createAgentInvoker', () => {
 
       expect(capturedCommands[0].cmd).toBe('cursor-agent');
       expect(capturedCommands[0].args).toContain('--force');
-      expect(capturedCommands[0].args).toContain('--trust');
       expect(capturedCommands[0].args).toContain('--print');
     });
   });
