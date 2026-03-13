@@ -72,6 +72,7 @@ echo "Extracting ..."
 unzip -q "${TMP_DIR}/artifact.zip" -d "${TMP_DIR}/extracted"
 
 # The zip contains a directory named after the triple; find the binary inside.
+# Find the executable inside the extracted folder
 EXTRACTED_BIN="$(find "${TMP_DIR}/extracted" -type f -name "${BIN_NAME}" | head -n 1)"
 if [[ -z "${EXTRACTED_BIN}" ]]; then
   echo "Binary '${BIN_NAME}' not found in the downloaded archive."
