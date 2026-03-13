@@ -1,7 +1,8 @@
 import { Command } from '@cliffy/command';
-import { claudeCommand } from '@cmd/commands/claude';
-import { cursorAgentCommand } from '@cmd/commands/cursor-agent';
-import { geminiCommand } from '@cmd/commands/gemini';
+import { promptCommand } from '@cmd/commands/prompt';
+import { listCommand } from '@cmd/commands/list';
+import { summaryCommand } from '@cmd/commands/summary';
+import { historyCommand } from '@cmd/commands/history';
 import { outputCommand } from '@cmd/commands/output';
 import packageJson from '../../package.json';
 
@@ -13,7 +14,8 @@ export const command = new Command()
   .env('INVOKE_AGENT_DATABASE_PATH=<filepath:string>', 'Path to the SQLite database file', {
     global: true,
   })
-  .command('claude', claudeCommand)
-  .command('cursor-agent', cursorAgentCommand)
-  .command('gemini', geminiCommand)
+  .command('prompt', promptCommand)
+  .command('list', listCommand)
+  .command('summary', summaryCommand)
+  .command('history', historyCommand)
   .command('output', outputCommand);

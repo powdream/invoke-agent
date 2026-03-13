@@ -1,24 +1,42 @@
 export type AgentType = 'gemini' | 'cursor-agent' | 'claude';
 
-export type AgentSessionId<T extends AgentType> = {
+export type AgentSessionId<T extends AgentType = AgentType> = {
   type: T;
   sessionId: string;
 };
 
-export type LookupSessionIdParams = {
-  [T in AgentType]: {
-    target: T;
-    by: AgentSessionId<Exclude<AgentType, T>>;
-  };
-}[AgentType];
+export interface ThreadTurn {
+  id: number;
+  requesterType: AgentType;
+  requesterSessionId: string;
+  responderType: AgentType;
+  responderSessionId: string;
+  prompt: string;
+  outputId: string;
+  createdAt: number;
+  output?: OutputRecord;
+}
 
-export interface SessionIdStorage {
-  lookup(params: LookupSessionIdParams): Promise<string | null>;
+export interface ThreadSummary {
+  responderType: AgentType;
+  responderSessionId: string;
+  summary: string;
+  lastThreadId: number;
+  updatedAt: number;
+}
 
-  bind<T extends AgentType>(
-    from: AgentSessionId<T>,
-    to: AgentSessionId<Exclude<AgentType, T>>,
-  ): Promise<void>;
+export interface ThreadStorage {
+  lookupLastSessionId(requester: AgentSessionId, targetAgentType: AgentType): Promise<string | null>;
+  append(params: {
+    requester: AgentSessionId;
+    responder: AgentSessionId;
+    prompt: string;
+    outputId: string;
+  }): Promise<void>;
+  listByRequester(requester: AgentSessionId): Promise<AgentSessionId[]>;
+  getThreadHistory(responder: AgentSessionId): Promise<ThreadTurn[]>;
+  getSummary(responder: AgentSessionId): Promise<ThreadSummary | null>;
+  saveSummary(params: { responder: AgentSessionId; summary: string; lastThreadId: number }): Promise<void>;
 }
 
 export type OutputId = string;
@@ -37,7 +55,7 @@ export interface OutputStorage {
 }
 
 export interface Storage {
-  sessionId: SessionIdStorage;
+  threads: ThreadStorage;
   output: OutputStorage;
   close(): void;
 }

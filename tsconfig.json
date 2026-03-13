@@ -9,7 +9,7 @@
       "@cmd/*": ["src/cmd/*"],
       "@lib/*": ["src/lib/*"]
     },
-    "types": ["bun-types"],
+    "types": ["@types/bun"],
     "verbatimModuleSyntax": true,
     "noEmit": true
   },

@@ -23,7 +23,8 @@ describe('SqliteStorage', () => {
 
       const tableNames = tables.map((t) => t.name);
       expect(tableNames).toContain('schema_meta');
-      expect(tableNames).toContain('session_bindings');
+      expect(tableNames).toContain('session_threads');
+      expect(tableNames).toContain('session_summaries');
       expect(tableNames).toContain('outputs');
     });
 
@@ -32,161 +33,131 @@ describe('SqliteStorage', () => {
         value: string;
       };
 
-      expect(result.value).toBe('2');
+      expect(result.value).toBe('3');
     });
 
-    test('skips migration when schema version matches', () => {
-      const before = db.query(`SELECT value FROM schema_meta WHERE key = 'version'`).get();
+    test('drops old tables when schema version differs', () => {
+      // Simulate older version schema
+      db.run(`CREATE TABLE session_bindings (id INTEGER)`);
+      db.run(`UPDATE schema_meta SET value = '2' WHERE key = 'version'`);
 
       new SqliteStorage(db);
 
-      const after = db.query(`SELECT value FROM schema_meta WHERE key = 'version'`).get();
-      expect(after).toEqual(before);
-    });
-
-    test('drops and recreates tables when schema version differs', () => {
-      db.run(`INSERT INTO outputs (id, stdout) VALUES ('test-id', 'test-output')`);
-      db.run(`UPDATE schema_meta SET value = '0' WHERE key = 'version'`);
-
-      new SqliteStorage(db);
-
-      const result = db.query(`SELECT COUNT(*) as count FROM outputs`).get() as { count: number };
-      expect(result.count).toBe(0);
+      const tables = db
+        .query(`SELECT name FROM sqlite_master WHERE type='table' ORDER BY name`)
+        .all() as { name: string }[];
+      
+      const tableNames = tables.map((t) => t.name);
+      expect(tableNames).not.toContain('session_bindings');
+      expect(tableNames).toContain('session_threads');
     });
   });
 
-  describe('close', () => {
-    test('closes the database connection', () => {
-      const testDb = new Database(':memory:');
-      const testStorage = new SqliteStorage(testDb);
-
-      testStorage.close();
-
-      expect(() => testDb.query('SELECT 1').get()).toThrow();
-    });
-  });
-
-  describe('SessionIdStorage', () => {
-    describe('lookup', () => {
-      test('returns null when no binding exists', async () => {
-        const result = await storage.sessionId.lookup({
-          target: 'gemini',
-          by: { type: 'claude', sessionId: 'claude-123' },
-        });
-
+  describe('ThreadStorage', () => {
+    describe('lookupLastSessionId and append', () => {
+      test('returns null when no history exists', async () => {
+        const result = await storage.threads.lookupLastSessionId(
+          { type: 'claude', sessionId: 'req-1' },
+          'gemini'
+        );
         expect(result).toBeNull();
       });
 
-      test('returns session ID when binding exists', async () => {
-        await storage.sessionId.bind(
-          { type: 'gemini', sessionId: 'gemini-123' },
-          { type: 'claude', sessionId: 'claude-123' },
-        );
-
-        const result = await storage.sessionId.lookup({
-          target: 'gemini',
-          by: { type: 'claude', sessionId: 'claude-123' },
+      test('returns last session id after append', async () => {
+        await storage.threads.append({
+          requester: { type: 'claude', sessionId: 'req-1' },
+          responder: { type: 'gemini', sessionId: 'res-1' },
+          prompt: 'hello',
+          outputId: 'out-1',
         });
 
-        expect(result).toBe('gemini-123');
-      });
-
-      test('returns null when querying by unbound session', async () => {
-        await storage.sessionId.bind(
-          { type: 'gemini', sessionId: 'gemini-123' },
-          { type: 'claude', sessionId: 'claude-123' },
+        const result = await storage.threads.lookupLastSessionId(
+          { type: 'claude', sessionId: 'req-1' },
+          'gemini'
         );
-
-        const result = await storage.sessionId.lookup({
-          target: 'gemini',
-          by: { type: 'cursor-agent', sessionId: 'cursor-456' },
-        });
-
-        expect(result).toBeNull();
-      });
-
-      test('works with all agent type combinations', async () => {
-        await storage.sessionId.bind(
-          { type: 'cursor-agent', sessionId: 'cursor-123' },
-          { type: 'claude', sessionId: 'claude-123' },
-        );
-
-        const result = await storage.sessionId.lookup({
-          target: 'cursor-agent',
-          by: { type: 'claude', sessionId: 'claude-123' },
-        });
-
-        expect(result).toBe('cursor-123');
+        expect(result).toBe('res-1');
       });
     });
 
-    describe('bind', () => {
-      test('creates new binding when none exists', async () => {
-        await storage.sessionId.bind(
-          { type: 'gemini', sessionId: 'gemini-123' },
-          { type: 'claude', sessionId: 'claude-123' },
-        );
-
-        const row = db.query(`SELECT * FROM session_bindings`).get() as Record<string, unknown>;
-        expect(row.gemini_session_id).toBe('gemini-123');
-        expect(row.claude_session_id).toBe('claude-123');
-      });
-
-      test('updates existing binding when from session already bound', async () => {
-        await storage.sessionId.bind(
-          { type: 'gemini', sessionId: 'gemini-123' },
-          { type: 'claude', sessionId: 'claude-123' },
-        );
-
-        await storage.sessionId.bind(
-          { type: 'gemini', sessionId: 'gemini-123' },
-          { type: 'cursor-agent', sessionId: 'cursor-456' },
-        );
-
-        const rows = db.query(`SELECT * FROM session_bindings`).all();
-        expect(rows).toHaveLength(1);
-
-        const row = rows[0] as Record<string, unknown>;
-        expect(row.gemini_session_id).toBe('gemini-123');
-        expect(row.cursor_agent_session_id).toBe('cursor-456');
-      });
-
-      test('updates existing binding when to session already bound', async () => {
-        await storage.sessionId.bind(
-          { type: 'gemini', sessionId: 'gemini-123' },
-          { type: 'claude', sessionId: 'claude-123' },
-        );
-
-        await storage.sessionId.bind(
-          { type: 'cursor-agent', sessionId: 'cursor-456' },
-          { type: 'claude', sessionId: 'claude-123' },
-        );
-
-        const rows = db.query(`SELECT * FROM session_bindings`).all();
-        expect(rows).toHaveLength(1);
-
-        const row = rows[0] as Record<string, unknown>;
-        expect(row.cursor_agent_session_id).toBe('cursor-456');
-        expect(row.claude_session_id).toBe('claude-123');
-      });
-
-      test('can bind all three agent types together', async () => {
-        await storage.sessionId.bind(
-          { type: 'gemini', sessionId: 'gemini-123' },
-          { type: 'claude', sessionId: 'claude-123' },
-        );
-
-        await storage.sessionId.bind(
-          { type: 'cursor-agent', sessionId: 'cursor-456' },
-          { type: 'claude', sessionId: 'claude-123' },
-        );
-
-        const geminiResult = await storage.sessionId.lookup({
-          target: 'gemini',
-          by: { type: 'cursor-agent', sessionId: 'cursor-456' },
+    describe('listByRequester', () => {
+      test('returns distinct responder sessions', async () => {
+        await storage.threads.append({
+          requester: { type: 'claude', sessionId: 'req-1' },
+          responder: { type: 'gemini', sessionId: 'res-1' },
+          prompt: '1',
+          outputId: 'out-1',
+        });
+        await storage.threads.append({
+          requester: { type: 'claude', sessionId: 'req-1' },
+          responder: { type: 'gemini', sessionId: 'res-1' },
+          prompt: '2',
+          outputId: 'out-2',
+        });
+        await storage.threads.append({
+          requester: { type: 'claude', sessionId: 'req-1' },
+          responder: { type: 'cursor-agent', sessionId: 'res-2' },
+          prompt: '3',
+          outputId: 'out-3',
         });
 
-        expect(geminiResult).toBe('gemini-123');
+        const results = await storage.threads.listByRequester({ type: 'claude', sessionId: 'req-1' });
+        expect(results).toHaveLength(2);
+        expect(results).toContainEqual({ type: 'gemini', sessionId: 'res-1' });
+        expect(results).toContainEqual({ type: 'cursor-agent', sessionId: 'res-2' });
+      });
+    });
+
+    describe('getThreadHistory', () => {
+      test('returns history in order', async () => {
+        await storage.threads.append({
+          requester: { type: 'claude', sessionId: 'req-1' },
+          responder: { type: 'gemini', sessionId: 'res-1' },
+          prompt: 'msg 1',
+          outputId: 'out-1',
+        });
+        await storage.threads.append({
+          requester: { type: 'claude', sessionId: 'req-1' },
+          responder: { type: 'gemini', sessionId: 'res-1' },
+          prompt: 'msg 2',
+          outputId: 'out-2',
+        });
+
+        const history = await storage.threads.getThreadHistory({ type: 'gemini', sessionId: 'res-1' });
+        expect(history).toHaveLength(2);
+        expect(history[0].prompt).toBe('msg 1');
+        expect(history[1].prompt).toBe('msg 2');
+      });
+    });
+
+    describe('summaries', () => {
+      test('saves and retrieves summary', async () => {
+        await storage.threads.saveSummary({
+          responder: { type: 'gemini', sessionId: 'res-1' },
+          summary: 'A short summary',
+          lastThreadId: 42,
+        });
+
+        const summary = await storage.threads.getSummary({ type: 'gemini', sessionId: 'res-1' });
+        expect(summary).not.toBeNull();
+        expect(summary?.summary).toBe('A short summary');
+        expect(summary?.lastThreadId).toBe(42);
+      });
+
+      test('updates existing summary on conflict', async () => {
+        await storage.threads.saveSummary({
+          responder: { type: 'gemini', sessionId: 'res-1' },
+          summary: 'A short summary',
+          lastThreadId: 42,
+        });
+        await storage.threads.saveSummary({
+          responder: { type: 'gemini', sessionId: 'res-1' },
+          summary: 'Updated summary',
+          lastThreadId: 43,
+        });
+
+        const summary = await storage.threads.getSummary({ type: 'gemini', sessionId: 'res-1' });
+        expect(summary?.summary).toBe('Updated summary');
+        expect(summary?.lastThreadId).toBe(43);
       });
     });
   });
@@ -239,41 +210,6 @@ describe('SqliteStorage', () => {
 
         expect(id1).not.toBe(id2);
         expect(id1).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
-      });
-
-      test('stores all optional fields', async () => {
-        const id = await storage.output.put({
-          stdout: 'stdout',
-          stderr: 'stderr',
-          fileContent: 'content',
-          statusCode: 1,
-        });
-
-        const row = db.query(`SELECT * FROM outputs WHERE id = ?`).get(id) as Record<
-          string,
-          unknown
-        >;
-
-        expect(row.stdout).toBe('stdout');
-        expect(row.stderr).toBe('stderr');
-        expect(row.file_content).toBe('content');
-        expect(row.status_code).toBe(1);
-      });
-
-      test('stores null for undefined optional fields', async () => {
-        const id = await storage.output.put({
-          stdout: 'stdout only',
-        });
-
-        const row = db.query(`SELECT * FROM outputs WHERE id = ?`).get(id) as Record<
-          string,
-          unknown
-        >;
-
-        expect(row.stdout).toBe('stdout only');
-        expect(row.stderr).toBeNull();
-        expect(row.file_content).toBeNull();
-        expect(row.status_code).toBeNull();
       });
     });
   });

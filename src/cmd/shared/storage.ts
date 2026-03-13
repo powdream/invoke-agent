@@ -21,7 +21,7 @@ export function createStorage(options: DbOptions): Storage & Disposable {
   mkdirSync(dirname(dbPath), { recursive: true });
   const storage = new SqliteStorage(new Database(dbPath));
   return {
-    sessionId: storage.sessionId,
+    threads: storage.threads,
     output: storage.output,
     close: () => storage.close(),
     [Symbol.dispose](): void {

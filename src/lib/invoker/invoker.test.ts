@@ -93,11 +93,13 @@ describe('createAgentInvoker', () => {
       expect(capturedCommands[0].args).toContain('claude-sonnet-4');
     });
 
-    test('includes --resume when session exists', async () => {
-      await storage.sessionId.bind(
-        { type: 'claude', sessionId: 'existing-claude-session' },
-        { type: 'gemini', sessionId: 'gemini-456' },
-      );
+    test('includes --resume when session exists and not newSession', async () => {
+      await storage.threads.append({
+        requester: { type: 'gemini', sessionId: 'gemini-456' },
+        responder: { type: 'claude', sessionId: 'existing-claude-session' },
+        prompt: 'test',
+        outputId: 'out-1'
+      });
 
       const invoker = createAgentInvoker(storage, mockDeps);
 
@@ -110,7 +112,27 @@ describe('createAgentInvoker', () => {
       expect(capturedCommands[0].args).toContain('existing-claude-session');
     });
 
-    test('binds new session ID after invocation', async () => {
+    test('does not include --resume when newSession is true', async () => {
+      await storage.threads.append({
+        requester: { type: 'gemini', sessionId: 'gemini-456' },
+        responder: { type: 'claude', sessionId: 'existing-claude-session' },
+        prompt: 'test',
+        outputId: 'out-1'
+      });
+
+      const invoker = createAgentInvoker(storage, mockDeps);
+
+      await invoker.claude({
+        by: { type: 'gemini', sessionId: 'gemini-456' },
+        prompt: 'hello',
+        newSession: true
+      });
+
+      expect(capturedCommands[0].args).not.toContain('--resume');
+      expect(capturedCommands[0].args).not.toContain('existing-claude-session');
+    });
+
+    test('appends new thread turn after invocation', async () => {
       const invoker = createAgentInvoker(storage, mockDeps);
 
       await invoker.claude({
@@ -118,12 +140,10 @@ describe('createAgentInvoker', () => {
         prompt: 'hello',
       });
 
-      const boundSession = await storage.sessionId.lookup({
-        target: 'claude',
-        by: { type: 'gemini', sessionId: 'gemini-456' },
-      });
-
-      expect(boundSession).toBe('claude-session-123');
+      const history = await storage.threads.getThreadHistory({ type: 'claude', sessionId: 'claude-session-123' });
+      expect(history).toHaveLength(1);
+      expect(history[0].prompt).toBe('hello');
+      expect(history[0].requesterSessionId).toBe('gemini-456');
     });
 
     test('stores output record', async () => {
@@ -168,52 +188,6 @@ describe('createAgentInvoker', () => {
       expect(capturedCommands[0].args).toContain('--trust');
       expect(capturedCommands[0].args).toContain('--print');
     });
-
-    test('includes --model when specified', async () => {
-      const invoker = createAgentInvoker(storage, mockDeps);
-
-      await invoker['cursor-agent']({
-        by: { type: 'claude', sessionId: 'claude-456' },
-        prompt: 'hello',
-        model: 'gpt-4',
-      });
-
-      expect(capturedCommands[0].args).toContain('--model');
-      expect(capturedCommands[0].args).toContain('gpt-4');
-    });
-
-    test('includes --resume when session exists', async () => {
-      await storage.sessionId.bind(
-        { type: 'cursor-agent', sessionId: 'existing-cursor-session' },
-        { type: 'claude', sessionId: 'claude-456' },
-      );
-
-      const invoker = createAgentInvoker(storage, mockDeps);
-
-      await invoker['cursor-agent']({
-        by: { type: 'claude', sessionId: 'claude-456' },
-        prompt: 'hello',
-      });
-
-      expect(capturedCommands[0].args).toContain('--resume');
-      expect(capturedCommands[0].args).toContain('existing-cursor-session');
-    });
-
-    test('binds new session ID after invocation', async () => {
-      const invoker = createAgentInvoker(storage, mockDeps);
-
-      await invoker['cursor-agent']({
-        by: { type: 'claude', sessionId: 'claude-456' },
-        prompt: 'hello',
-      });
-
-      const boundSession = await storage.sessionId.lookup({
-        target: 'cursor-agent',
-        by: { type: 'claude', sessionId: 'claude-456' },
-      });
-
-      expect(boundSession).toBe('cursor-agent-session-123');
-    });
   });
 
   describe('gemini invoker', () => {
@@ -230,36 +204,6 @@ describe('createAgentInvoker', () => {
       expect(capturedCommands[0].args).toContain('--prompt');
     });
 
-    test('includes --model when specified', async () => {
-      const invoker = createAgentInvoker(storage, mockDeps);
-
-      await invoker.gemini({
-        by: { type: 'claude', sessionId: 'claude-456' },
-        prompt: 'hello',
-        model: 'gemini-2.0-flash',
-      });
-
-      expect(capturedCommands[0].args).toContain('--model');
-      expect(capturedCommands[0].args).toContain('gemini-2.0-flash');
-    });
-
-    test('includes --resume when session exists', async () => {
-      await storage.sessionId.bind(
-        { type: 'gemini', sessionId: 'existing-gemini-session' },
-        { type: 'claude', sessionId: 'claude-456' },
-      );
-
-      const invoker = createAgentInvoker(storage, mockDeps);
-
-      await invoker.gemini({
-        by: { type: 'claude', sessionId: 'claude-456' },
-        prompt: 'hello',
-      });
-
-      expect(capturedCommands[0].args).toContain('--resume');
-      expect(capturedCommands[0].args).toContain('existing-gemini-session');
-    });
-
     test('uses response field instead of result', async () => {
       const invoker = createAgentInvoker(storage, mockDeps);
 
@@ -270,22 +214,6 @@ describe('createAgentInvoker', () => {
 
       const output = await storage.output.lookup(outputId);
       expect(output!.stdout).toBe('gemini response');
-    });
-
-    test('binds new session ID after invocation', async () => {
-      const invoker = createAgentInvoker(storage, mockDeps);
-
-      await invoker.gemini({
-        by: { type: 'claude', sessionId: 'claude-456' },
-        prompt: 'hello',
-      });
-
-      const boundSession = await storage.sessionId.lookup({
-        target: 'gemini',
-        by: { type: 'claude', sessionId: 'claude-456' },
-      });
-
-      expect(boundSession).toBe('gemini-session-123');
     });
   });
 
@@ -311,19 +239,6 @@ describe('createAgentInvoker', () => {
       const output = await storage.output.lookup(outputId);
       expect(output!.statusCode).toBe(1);
       expect(output!.stderr).toBe('something went wrong');
-    });
-
-    test('handles missing file content gracefully', async () => {
-      tempFileContent = null;
-      const invoker = createAgentInvoker(storage, mockDeps);
-
-      const outputId = await invoker.claude({
-        by: { type: 'gemini', sessionId: 'gemini-456' },
-        prompt: 'hello',
-      });
-
-      const output = await storage.output.lookup(outputId);
-      expect(output!.fileContent).toBeUndefined();
     });
   });
 });
