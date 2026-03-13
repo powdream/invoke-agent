@@ -21,4 +21,4 @@ Invoke the invoke-agent CLI to run a request targeting a specific AI agent, cont
 
 3. The command **returns an output ID** when it finishes. You can pass that ID to the output skill (`/invoke-agent:output <output-id>`) or use `invoke-agent output get <output-id>` to read the result (stdout, stderr, file content, exit status).
 
-If the user has not set `INVOKE_AGENT_DATABASE_PATH`, remind them to configure it or pass `--db <path>` if running invoke-agent manually.
+If `INVOKE_AGENT_DATABASE_PATH` is not set, append `--db <project-root>/.invoke-agent/communication.db` to the command, where `<project-root>` is the directory where the AI agent CLI (e.g. Claude Code) was originally started — you already know this from your session context.

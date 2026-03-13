@@ -15,4 +15,4 @@ Invoke the invoke-agent CLI to list all responder sessions associated with a spe
    ```
 3. The command will output a list of target agents, their session IDs, and an AI-generated summary (up to 300 characters) for each session thread.
 
-If the user has not set `INVOKE_AGENT_DATABASE_PATH`, remind them to configure it.
+If `INVOKE_AGENT_DATABASE_PATH` is not set, append `--db <project-root>/.invoke-agent/communication.db` to the command, where `<project-root>` is the directory where the AI agent CLI (e.g. Claude Code) was originally started — you already know this from your session context.
