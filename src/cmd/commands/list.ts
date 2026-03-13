@@ -1,5 +1,6 @@
 import { Command } from '@cliffy/command';
 import { createStorage } from '@cmd/shared/storage';
+import { getOrGenerateSummary } from '@cmd/commands/summary';
 import type { AgentType } from '@lib/storage';
 
 export const listCommand = new Command()
@@ -24,8 +25,13 @@ export const listCommand = new Command()
     console.log(`Found ${sessions.length} session(s) for requester ${requester.type}:${requester.sessionId}:\n`);
 
     for (const session of sessions) {
-      const summary = await storage.threads.getSummary(session);
-      const summaryText = summary ? (summary.summary.substring(0, 100) + (summary.summary.length > 100 ? '...' : '')) : '(No summary available, run "summary" command)';
+      let summaryText = '(Failed to generate summary)';
+      try {
+        const summary = await getOrGenerateSummary(storage, session);
+        summaryText = summary.substring(0, 100) + (summary.length > 100 ? '...' : '');
+      } catch (e) {
+        // Ignored, keep placeholder
+      }
       
       console.log(`- Responder: ${session.type}`);
       console.log(`  Session ID: ${session.sessionId}`);
