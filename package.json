@@ -1,6 +1,6 @@
 {
   "name": "invoke-agent",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "type": "module",
   "scripts": {
     "dev": "bun run src/cmd/main.ts",
