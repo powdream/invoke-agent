@@ -31,10 +31,13 @@ export const historyCommand = new Command()
       console.log(`\n==================================================`);
       console.log(`[Agent Response] (${responder.type})`);
       console.log(`==================================================`);
-      if (output?.stdout) {
-        console.log(output.stdout);
+      
+      const responseText = output?.stdout || output?.fileContent;
+      
+      if (responseText) {
+        console.log(responseText);
       } else {
-        console.log(`(No output found or stdout was empty)`);
+        console.log(`(No output found or stdout/fileContent was empty)`);
       }
     }
     console.log(`\n==================================================`);

@@ -28,7 +28,7 @@ export const listCommand = new Command()
       let summaryText = '(Failed to generate summary)';
       try {
         const summary = await getOrGenerateSummary(storage, session);
-        summaryText = summary.substring(0, 100) + (summary.length > 100 ? '...' : '');
+        summaryText = summary.substring(0, 300) + (summary.length > 300 ? '...' : '');
       } catch (e) {
         // Ignored, keep placeholder
       }
