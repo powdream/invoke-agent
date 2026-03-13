@@ -42,7 +42,7 @@ if [[ -z "${LATEST_VERSION}" ]]; then
   exit 1
 fi
 
-ASSET_NAME="${BIN_NAME}-${LATEST_VERSION}-${TRIPLE}.zip"
+ASSET_NAME="${BIN_NAME}-${LATEST_VERSION#v}-${TRIPLE}.zip"
 DOWNLOAD_URL="${BASE_URL}/${ASSET_NAME}"
 
 echo "Latest version : ${LATEST_VERSION}"
