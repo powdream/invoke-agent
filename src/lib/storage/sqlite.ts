@@ -108,7 +108,7 @@ class SqliteThreadStorage implements ThreadStorage {
       ORDER BY id DESC
       LIMIT 1
     `;
-    const result = this.db.query(query).get(requester.type, requester.sessionId, targetAgentType) as { responder_session_id: string } | null;
+    const result = this.db.query(query).get(requester.type, requester.sessionId.toLowerCase(), targetAgentType) as { responder_session_id: string } | null;
     return result ? result.responder_session_id : null;
   }
 
@@ -121,9 +121,9 @@ class SqliteThreadStorage implements ThreadStorage {
       ) VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
     this.db.run(query, [
-      params.requester.type, params.requester.sessionId,
-      params.responder.type, params.responder.sessionId,
-      params.prompt, params.outputId, Date.now()
+      params.requester.type, params.requester.sessionId.toLowerCase(),
+      params.responder.type, params.responder.sessionId, // Keep original case for external agents
+      params.prompt, params.outputId.toLowerCase(), Date.now()
     ]);
   }
 
@@ -133,7 +133,7 @@ class SqliteThreadStorage implements ThreadStorage {
       FROM session_threads
       WHERE requester_type = ? AND requester_session_id = ?
     `;
-    const results = this.db.query(query).all(requester.type, requester.sessionId) as { responder_type: string, responder_session_id: string }[];
+    const results = this.db.query(query).all(requester.type, requester.sessionId.toLowerCase()) as { responder_type: string, responder_session_id: string }[];
     return results.map(r => ({ type: r.responder_type as AgentType, sessionId: r.responder_session_id }));
   }
 
@@ -144,6 +144,7 @@ class SqliteThreadStorage implements ThreadStorage {
       WHERE responder_type = ? AND responder_session_id = ?
       ORDER BY id ASC
     `;
+    // We must query exactly as passed (case-sensitive) because we saved the responder's original casing
     const results = this.db.query(query).all(responder.type, responder.sessionId) as {
       id: number;
       requester_type: string;
@@ -173,6 +174,7 @@ class SqliteThreadStorage implements ThreadStorage {
       FROM session_summaries
       WHERE responder_type = ? AND responder_session_id = ?
     `;
+    // Must query exactly as passed
     const result = this.db.query(query).get(responder.type, responder.sessionId) as {
       responder_type: string;
       responder_session_id: string;
@@ -202,7 +204,7 @@ class SqliteThreadStorage implements ThreadStorage {
         updated_at = excluded.updated_at
     `;
     this.db.run(query, [
-      params.responder.type, params.responder.sessionId,
+      params.responder.type, params.responder.sessionId, // Keep original case
       params.summary, params.lastThreadId, Date.now()
     ]);
   }
